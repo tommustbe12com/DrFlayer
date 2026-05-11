@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Donut SMP Hub</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="sidebar">
+    <div class="sidebar-title">Previous Bots</div>
+    <div id="saved-bots"></div>
+</div>
+
+<div class="main">
+    <div class="topbar">
+        <input id="username" placeholder="Microsoft Email">
+        <input id="host" value="play.donutsmp.net" disabled>
+        <button onclick="createBot()">Add Bot</button>
+    </div>
+
+    <div class="tabs-bar">
+        <button class="tab active" data-tab="master" onclick="switchTab('master')">Master</button>
+    </div>
+
+    <div id="tab-master" class="tab-panel active">
+        <div class="master-search">
+            <input id="search-username" placeholder="Search any player stats on Donut...">
+            <button onclick="searchPlayer()">Search</button>
+        </div>
+        <div id="search-result" class="scoreboard" style="display:none"></div>
+
+        <div class="master-cmd">
+            <div class="master-warning" title="This command will run on ALL online bots. This can lead to bans, or other issues!">Will run on all online bots.</div>
+            <input id="master-cmd" placeholder="Broadcast command to all online bots...">
+            <button onclick="broadcastCommand()">Send All</button>
+        </div>
+
+        <div class="logs" id="master-logs"></div>
+    </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
