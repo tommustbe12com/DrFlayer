@@ -49,7 +49,7 @@ export async function createBotInstance({ email, host, io }) {
         bot.once("spawn", () => {
             mcName = bot.username;
 
-            bots[mcName] = { bot, email, username: mcName };
+            bots[mcName] = { bot, email, username: mcName, startedAt: Date.now() };
             creating.delete(email);
 
             // dont show modal cuz its safe anyway

@@ -76,3 +76,18 @@ Each connected bot gets its own tab with live chat, logs, stats, and reconnect h
 * Donut SMP allows around 5 bots per IP
 * DrFlayer warns you before hitting the limit
 * Auth files are stored locally in `auth/`
+
+---
+
+## Discord Status Embed (optional)
+
+Posts one embed message and edits it every ~10 seconds with:
+* Connected bot list + uptime
+* DonutSMP stats snapshot (shards/playtime/money, cached ~60s)
+* Recent dashboard logs
+
+Set environment variables:
+* `DISCORD_TOKEN` (required)
+* `DISCORD_STATUS_CHANNEL_ID` (required) – channel to post/edit the status embed
+* `DISCORD_STATUS_MESSAGE_ID` (optional) – if set, edits that message instead of creating one
+* `DONUTSMP_API_KEY` (optional) – used for `/api/stats/*` and the Discord embed stats

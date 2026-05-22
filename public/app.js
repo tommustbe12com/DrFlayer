@@ -8,7 +8,55 @@ window.createBot = createBot;
 window.switchTab = switchTab;
 window.searchPlayer = searchPlayer;
 window.broadcastCommand = broadcastCommand;
+window.saveDiscordConfig = saveDiscordConfig;
 window._statIntervals = {};
+
+async function loadDiscordConfig() {
+  try {
+    const res = await fetch("/api/discord/config");
+    if (!res.ok) return;
+    const cfg = await res.json();
+
+    document.getElementById("discord-token").value = cfg?.token ? "********" : "";
+    document.getElementById("discord-channel").value = cfg?.channelId || "";
+    document.getElementById("discord-message").value = cfg?.messageId || "";
+
+    const status = document.getElementById("discord-status-text");
+    status.textContent = cfg?.enabled
+      ? `Enabled. Updating every ~${Math.round((cfg.updateEveryMs || 10000) / 1000)}s. Editing message: ${cfg.messageId || "(auto)"}`
+      : "Not configured.";
+  } catch {
+    // ignore
+  }
+}
+
+async function saveDiscordConfig() {
+  const token = document.getElementById("discord-token").value.trim();
+  const channelId = document.getElementById("discord-channel").value.trim();
+  const messageId = document.getElementById("discord-message").value.trim();
+
+  const status = document.getElementById("discord-status-text");
+  status.textContent = "Saving…";
+
+  try {
+    const res = await fetch("/api/discord/config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        token: token === "********" ? undefined : token,
+        channelId,
+        messageId: messageId || undefined,
+        enabled: Boolean(channelId && (token || token === "********")),
+      }),
+    });
+    const json = await res.json().catch(() => ({}));
+    status.textContent = res.ok ? "Saved. Discord embed will update within ~10s." : (json?.error || "Save failed.");
+  } catch {
+    status.textContent = "Save failed.";
+  }
+
+  await loadDiscordConfig();
+}
 
 // mc color code parser (tommustbe12.com/mccolor.html
 const MC_COLORS = {
@@ -536,3 +584,4 @@ function line(text) {
 
 // init
 renderSavedBots();
+loadDiscordConfig();

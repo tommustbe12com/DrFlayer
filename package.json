@@ -7,6 +7,7 @@
     "start": "node server.js"
   },
   "dependencies": {
+    "discord.js": "^14.19.3",
     "express": "^4.19.2",
     "minecraft-protocol": "^1.66.1",
     "mineflayer": "^4.37.1",

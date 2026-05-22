@@ -524,3 +524,36 @@ button:hover {
     gap: 10px;
     font-size: 13px;
 }
+
+.panel-card {
+    background: #101010;
+    border: 1px solid #2a2a2a;
+    border-radius: 6px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.panel-title {
+    font-size: 12px;
+    color: #bbb;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.panel-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.panel-row input {
+    flex: 1;
+    min-width: 220px;
+}
+
+.panel-hint {
+    font-size: 12px;
+    color: #777;
+}

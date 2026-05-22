@@ -23,6 +23,17 @@
     </div>
 
     <div id="tab-master" class="tab-panel active">
+        <div class="panel-card">
+            <div class="panel-title">Discord Status Embed</div>
+            <div class="panel-row">
+                <input id="discord-token" placeholder="Discord bot token (stored locally on this server)">
+                <input id="discord-channel" placeholder="Channel ID">
+                <input id="discord-message" placeholder="Message ID (optional)">
+                <button onclick="saveDiscordConfig()">Save</button>
+            </div>
+            <div class="panel-hint" id="discord-status-text">Not configured.</div>
+        </div>
+
         <div class="master-search">
             <input id="search-username" placeholder="Search any player stats on Donut...">
             <button onclick="searchPlayer()">Search</button>
