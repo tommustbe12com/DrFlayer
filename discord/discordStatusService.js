@@ -72,6 +72,7 @@ export function startDiscordStatusService({
   storagePath = "./.data/discord-status.json",
   updateEveryMs = DEFAULT_UPDATE_MS,
   statsTtlMs = DEFAULT_STATS_TTL_MS,
+  keepAtBottom = false,
 }) {
   token = token ?? process.env.DISCORD_TOKEN;
   channelId = channelId ?? process.env.DISCORD_STATUS_CHANNEL_ID;
@@ -199,6 +200,29 @@ export function startDiscordStatusService({
       const embed = await buildEmbed();
       await msg.edit({ embeds: [embed] });
 
+      if (keepAtBottom) {
+        try {
+          // Repost occasionally so the status stays near the bottom of the channel.
+          // (Editing does not bump messages in Discord.)
+          const persisted = readJson(storagePath);
+          const lastRepostAt = persisted?.lastRepostAt ? Date.parse(persisted.lastRepostAt) : 0;
+          if (!lastRepostAt || Date.now() - lastRepostAt > 5 * 60_000) {
+            const newMsg = await channel.send({ embeds: [embed] });
+            try { await msg.delete(); } catch { }
+            lastMessageId = newMsg.id;
+            writeJsonAtomic(storagePath, {
+              channelId,
+              messageId: lastMessageId,
+              updatedAt: new Date().toISOString(),
+              lastRepostAt: new Date().toISOString(),
+            });
+            return;
+          }
+        } catch {
+          // ignore repost failures
+        }
+      }
+
       writeJsonAtomic(storagePath, { channelId, messageId: lastMessageId, updatedAt: new Date().toISOString() });
     } catch {
       // keep running; next tick may recover
@@ -218,5 +242,12 @@ export function startDiscordStatusService({
       await client.destroy();
     },
     getMessageId: () => lastMessageId,
+    send: async ({ channelId: targetChannelId, content, embeds }) => {
+      const cid = targetChannelId || channelId;
+      if (!cid) return;
+      const ch = await client.channels.fetch(cid).catch(() => null);
+      if (!ch || !("send" in ch)) return;
+      return ch.send({ content, embeds });
+    },
   };
 }

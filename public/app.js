@@ -8,54 +8,88 @@ window.createBot = createBot;
 window.switchTab = switchTab;
 window.searchPlayer = searchPlayer;
 window.broadcastCommand = broadcastCommand;
-window.saveDiscordConfig = saveDiscordConfig;
+window.saveSettings = saveSettings;
 window._statIntervals = {};
 
-async function loadDiscordConfig() {
+async function loadSettings() {
   try {
-    const res = await fetch("/api/discord/config");
+    const res = await fetch("/api/settings");
     if (!res.ok) return;
-    const cfg = await res.json();
+    const settings = await res.json();
 
-    document.getElementById("discord-token").value = cfg?.token ? "********" : "";
-    document.getElementById("discord-channel").value = cfg?.channelId || "";
-    document.getElementById("discord-message").value = cfg?.messageId || "";
+    const discord = settings?.discord || {};
+    document.getElementById("discord-token").value = discord?.token ? "********" : "";
+    document.getElementById("discord-channel").value = discord?.channelId || "";
+    document.getElementById("discord-message").value = discord?.messageId || "";
+    const discordEnabledEl = document.getElementById("discord-enabled");
+    if (discordEnabledEl) discordEnabledEl.checked = Boolean(discord?.enabled);
+    const keepBottomEl = document.getElementById("discord-keep-bottom");
+    if (keepBottomEl) keepBottomEl.checked = Boolean(discord?.keepAtBottom);
 
-    const status = document.getElementById("discord-status-text");
-    status.textContent = cfg?.enabled
-      ? `Enabled. Updating every ~${Math.round((cfg.updateEveryMs || 10000) / 1000)}s. Editing message: ${cfg.messageId || "(auto)"}`
-      : "Not configured.";
+    const skelly = settings?.autoSkelly || {};
+    const skellyEnabledEl = document.getElementById("skelly-enabled");
+    if (skellyEnabledEl) skellyEnabledEl.checked = Boolean(skelly?.enabled);
+    const skellyAlertEl = document.getElementById("skelly-alert");
+    if (skellyAlertEl) skellyAlertEl.checked = Boolean(skelly?.alertEnabled);
+    const mentionsEl = document.getElementById("skelly-mentions");
+    if (mentionsEl) mentionsEl.value = skelly?.mentionIds || "";
+    const alertChanEl = document.getElementById("skelly-alert-channel");
+    if (alertChanEl) alertChanEl.value = skelly?.alertChannelId || "";
+
+    const status = document.getElementById("settings-status-text") || document.getElementById("discord-status-text");
+    if (status) {
+      status.textContent = discord?.enabled
+        ? `Discord enabled. Status channel: ${discord.channelId || "(missing)"} • Message: ${discord.messageId || "(auto)"} • Bottom: ${discord.keepAtBottom ? "on" : "off"}`
+        : "Discord not enabled.";
+    }
   } catch {
     // ignore
   }
 }
 
-async function saveDiscordConfig() {
+async function saveSettings() {
   const token = document.getElementById("discord-token").value.trim();
   const channelId = document.getElementById("discord-channel").value.trim();
   const messageId = document.getElementById("discord-message").value.trim();
 
-  const status = document.getElementById("discord-status-text");
-  status.textContent = "Saving…";
+  const discordEnabled = document.getElementById("discord-enabled")?.checked ?? Boolean(channelId);
+  const keepAtBottom = document.getElementById("discord-keep-bottom")?.checked ?? false;
+
+  const skellyEnabled = document.getElementById("skelly-enabled")?.checked ?? false;
+  const skellyAlert = document.getElementById("skelly-alert")?.checked ?? false;
+  const mentionIds = document.getElementById("skelly-mentions")?.value?.trim?.() ?? "";
+  const alertChannelId = document.getElementById("skelly-alert-channel")?.value?.trim?.() ?? "";
+
+  const status = document.getElementById("settings-status-text") || document.getElementById("discord-status-text");
+  if (status) status.textContent = "Saving...";
 
   try {
-    const res = await fetch("/api/discord/config", {
+    const res = await fetch("/api/settings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        token: token === "********" ? undefined : token,
-        channelId,
-        messageId: messageId || undefined,
-        enabled: Boolean(channelId && (token || token === "********")),
+        discord: {
+          token: token === "********" ? undefined : token,
+          channelId,
+          messageId: messageId || undefined,
+          enabled: Boolean(discordEnabled && channelId && (token || token === "********")),
+          keepAtBottom,
+        },
+        autoSkelly: {
+          enabled: Boolean(skellyEnabled),
+          alertEnabled: Boolean(skellyAlert),
+          mentionIds,
+          alertChannelId,
+        },
       }),
     });
     const json = await res.json().catch(() => ({}));
-    status.textContent = res.ok ? "Saved. Discord embed will update within ~10s." : (json?.error || "Save failed.");
+    if (status) status.textContent = res.ok ? "Saved." : (json?.error || "Save failed.");
   } catch {
-    status.textContent = "Save failed.";
+    if (status) status.textContent = "Save failed.";
   }
 
-  await loadDiscordConfig();
+  await loadSettings();
 }
 
 // mc color code parser (tommustbe12.com/mccolor.html
@@ -491,16 +525,34 @@ async function searchPlayer() {
   const name = document.getElementById('search-username').value.trim();
   if (!name) return;
 
-  const box = document.getElementById('search-result');
-  box.style.display = 'block';
-  box.replaceChildren(line('Loading...'));
+  const grid = document.getElementById('stats-grid');
+  const hint = document.getElementById('stats-hint');
+  if (hint) hint.textContent = "Loading...";
+  if (grid) grid.style.display = 'none';
 
   try {
     const res = await fetch(`/api/stats/${name}`);
-    if (!res.ok) { box.replaceChildren(line('Player not found.')); return; }
+    if (!res.ok) { if (hint) hint.textContent = "Player not found."; return; }
     const json = await res.json();
     const data = json?.result;
-    if (!data) { box.replaceChildren(line('No data.')); return; }
+    if (!data) { if (hint) hint.textContent = "No data."; return; }
+
+    if (hint) hint.textContent = `Stats for ${name}`;
+    if (!grid) return;
+    grid.style.display = 'grid';
+    grid.replaceChildren(
+      statBox("💎 Shards", fmt(data.shards)),
+      statBox("💰 Money", fmt(data.money)),
+      statBox("🕒 Playtime", fmtPlaytime(data.playtime)),
+      statBox("⚔️ Kills", fmt(data.kills)),
+      statBox("💀 Deaths", fmt(data.deaths)),
+      statBox("⛏ Broken", fmtCommas(data.broken_blocks)),
+      statBox("🏗 Placed", fmtCommas(data.placed_blocks)),
+      statBox("🧟 Mobs Killed", fmtCommas(data.mobs_killed)),
+      statBox("🛒 Shop Spent", fmt(data.money_spent_on_shop)),
+      statBox("💸 Earned", fmt(data.money_made_from_sell))
+    );
+    return;
 
     box.replaceChildren(
       line(`💰 Money: ${fmt(data.money)}`),
@@ -590,6 +642,20 @@ function line(text) {
   return div;
 }
 
+function statBox(label, value) {
+  const box = document.createElement("div");
+  box.className = "stat-box";
+  const l = document.createElement("div");
+  l.className = "stat-label";
+  l.textContent = label;
+  const v = document.createElement("div");
+  v.className = "stat-value";
+  v.textContent = value;
+  box.appendChild(l);
+  box.appendChild(v);
+  return box;
+}
+
 // init
 renderSavedBots();
-loadDiscordConfig();
+loadSettings();

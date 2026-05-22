@@ -20,26 +20,11 @@
 
     <div class="tabs-bar">
         <button class="tab active" data-tab="master" onclick="switchTab('master')">Master</button>
+        <button class="tab" data-tab="stats" onclick="switchTab('stats')">Stats</button>
+        <button class="tab" data-tab="settings" onclick="switchTab('settings')">Settings</button>
     </div>
 
     <div id="tab-master" class="tab-panel active">
-        <div class="panel-card">
-            <div class="panel-title">Discord Status Embed</div>
-            <div class="panel-row">
-                <input id="discord-token" placeholder="Discord bot token (stored locally on this server)">
-                <input id="discord-channel" placeholder="Channel ID">
-                <input id="discord-message" placeholder="Message ID (optional)">
-                <button onclick="saveDiscordConfig()">Save</button>
-            </div>
-            <div class="panel-hint" id="discord-status-text">Not configured.</div>
-        </div>
-
-        <div class="master-search">
-            <input id="search-username" placeholder="Search any player stats on Donut...">
-            <button onclick="searchPlayer()">Search</button>
-        </div>
-        <div id="search-result" class="scoreboard" style="display:none"></div>
-
         <div class="master-cmd">
             <div class="master-warning" title="This command will run on ALL online bots. This can lead to bans, or other issues!">Will run on all online bots.</div>
             <input id="master-cmd" placeholder="Broadcast command to all online bots...">
@@ -47,6 +32,49 @@
         </div>
 
         <div class="logs" id="master-logs"></div>
+    </div>
+
+    <div id="tab-stats" class="tab-panel">
+        <div class="panel-card">
+            <div class="panel-title">Player Stats</div>
+            <div class="panel-row">
+                <input id="search-username" placeholder="Search any player stats on Donut...">
+                <button onclick="searchPlayer()">Search</button>
+            </div>
+            <div id="stats-grid" class="stats-grid" style="display:none"></div>
+            <div class="panel-hint" id="stats-hint">Search a username to view stats.</div>
+        </div>
+    </div>
+
+    <div id="tab-settings" class="tab-panel">
+        <div class="panel-card">
+            <div class="panel-title">Discord</div>
+            <div class="panel-row">
+                <input id="discord-token" placeholder="Discord bot token (stored locally on this server)">
+                <input id="discord-channel" placeholder="Status channel ID">
+                <input id="discord-message" placeholder="Status message ID (optional)">
+            </div>
+            <div class="panel-row">
+                <label class="checkline"><input id="discord-enabled" type="checkbox"> Enable status embed</label>
+                <label class="checkline"><input id="discord-keep-bottom" type="checkbox"> Keep embed at bottom (reposts)</label>
+                <button onclick="saveSettings()">Save Settings</button>
+            </div>
+            <div class="panel-hint" id="settings-status-text">Not configured.</div>
+        </div>
+
+        <div class="panel-card">
+            <div class="panel-title">Auto-Buy Skelly</div>
+            <div class="panel-row">
+                <label class="checkline"><input id="skelly-enabled" type="checkbox"> Auto-Buy Skelly (when ≥ 1.5k shards)</label>
+                <label class="checkline"><input id="skelly-alert" type="checkbox"> Alert for Skelly</label>
+            </div>
+            <div class="panel-row">
+                <input id="skelly-mentions" placeholder="Mentions (comma separated @userId / @&roleId)">
+                <input id="skelly-alert-channel" placeholder="Alert channel ID (optional)">
+                <button onclick="saveSettings()">Save Settings</button>
+            </div>
+            <div class="panel-hint">Default is off. Alerts only fire if enabled + shard threshold hit.</div>
+        </div>
     </div>
 </div>
 

@@ -6,6 +6,7 @@ import debug from "debug";
 import { startDiscordStatusService } from "./discord/discordStatusService.js";
 import fs from "fs";
 import path from "path";
+import { startAutoSkelly } from "./bots/autoSkelly.js";
 
 const app = express();
 const server = http.createServer(app);
@@ -50,18 +51,21 @@ async function fetchDonutStats(username) {
     }
 }
 
-const DISCORD_CONFIG_PATH = "./.data/discord-config.json";
-function readDiscordConfig() {
+const SETTINGS_PATH = "./.data/settings.json";
+function readSettings() {
     try {
-        return JSON.parse(fs.readFileSync(DISCORD_CONFIG_PATH, "utf8"));
+        return JSON.parse(fs.readFileSync(SETTINGS_PATH, "utf8"));
     } catch {
-        return { enabled: false };
+        return {
+            discord: { enabled: false, token: "", channelId: "", messageId: "", updateEveryMs: 10000, keepAtBottom: false },
+            autoSkelly: { enabled: false, alertEnabled: false, mentionIds: "", alertChannelId: "" },
+        };
     }
 }
 
-function writeDiscordConfig(config) {
-    fs.mkdirSync(path.dirname(DISCORD_CONFIG_PATH), { recursive: true });
-    fs.writeFileSync(DISCORD_CONFIG_PATH, JSON.stringify(config, null, 2), "utf8");
+function writeSettings(settings) {
+    fs.mkdirSync(path.dirname(SETTINGS_PATH), { recursive: true });
+    fs.writeFileSync(SETTINGS_PATH, JSON.stringify(settings, null, 2), "utf8");
 }
 
 app.use(express.static("public"));
@@ -96,20 +100,38 @@ app.get("/api/stats/:username", async (req, res) => {
 });
 
 // discord config (local dashboard convenience; do not expose publicly)
-app.get("/api/discord/config", (req, res) => {
-    const cfg = readDiscordConfig();
+app.get("/api/settings", (req, res) => {
+    const settings = readSettings();
     res.json({
-        enabled: Boolean(cfg.enabled),
-        channelId: cfg.channelId || "",
-        messageId: cfg.messageId || "",
-        updateEveryMs: cfg.updateEveryMs || 10000,
-        token: cfg.token ? "********" : "",
+        discord: {
+            enabled: Boolean(settings.discord?.enabled),
+            channelId: settings.discord?.channelId || "",
+            messageId: settings.discord?.messageId || "",
+            updateEveryMs: settings.discord?.updateEveryMs || 10000,
+            keepAtBottom: Boolean(settings.discord?.keepAtBottom),
+            token: settings.discord?.token ? "********" : "",
+        },
+        autoSkelly: {
+            enabled: Boolean(settings.autoSkelly?.enabled),
+            alertEnabled: Boolean(settings.autoSkelly?.alertEnabled),
+            mentionIds: settings.autoSkelly?.mentionIds || "",
+            alertChannelId: settings.autoSkelly?.alertChannelId || "",
+        },
     });
 });
 
 let discordService = null;
+let currentSettings = null;
+function getSettingsCached() {
+    if (!currentSettings) currentSettings = readSettings();
+    return currentSettings;
+}
+function setSettingsCached(s) {
+    currentSettings = s;
+}
 function startDiscordFromConfig() {
-    const cfg = readDiscordConfig();
+    const settings = getSettingsCached();
+    const cfg = settings.discord;
     if (!cfg?.enabled) return;
 
     discordService = startDiscordStatusService({
@@ -120,6 +142,7 @@ function startDiscordFromConfig() {
         channelId: cfg.channelId,
         messageId: cfg.messageId,
         updateEveryMs: cfg.updateEveryMs || 10000,
+        keepAtBottom: Boolean(cfg.keepAtBottom),
     });
 }
 
@@ -129,27 +152,39 @@ async function restartDiscordFromConfig() {
     startDiscordFromConfig();
 }
 
-app.post("/api/discord/config", async (req, res) => {
-    const existing = readDiscordConfig();
-    const enabled = Boolean(req.body?.enabled);
-    const channelId = String(req.body?.channelId || "").trim();
-    const messageId = String(req.body?.messageId || "").trim();
+app.post("/api/settings", async (req, res) => {
+    const existing = readSettings();
+    const body = req.body || {};
 
-    // allow leaving token unchanged by omitting it
-    const token =
-        typeof req.body?.token === "string" && req.body.token.trim().length
-            ? req.body.token.trim()
-            : existing.token;
+    const discordExisting = existing.discord || {};
+    const discordBody = body.discord || {};
 
-    const next = {
-        enabled,
-        channelId,
-        messageId: messageId || "",
-        token: token || "",
+    const discordToken =
+        typeof discordBody.token === "string" && discordBody.token.trim().length
+            ? discordBody.token.trim()
+            : discordExisting.token;
+
+    const discord = {
+        enabled: Boolean(discordBody.enabled),
+        channelId: String(discordBody.channelId || "").trim(),
+        messageId: String(discordBody.messageId || "").trim(),
+        token: discordToken || "",
         updateEveryMs: 10000,
+        keepAtBottom: Boolean(discordBody.keepAtBottom),
     };
 
-    writeDiscordConfig(next);
+    const skellyExisting = existing.autoSkelly || {};
+    const skellyBody = body.autoSkelly || {};
+    const autoSkelly = {
+        enabled: Boolean(skellyBody.enabled),
+        alertEnabled: Boolean(skellyBody.alertEnabled),
+        mentionIds: String(skellyBody.mentionIds || "").trim(),
+        alertChannelId: String(skellyBody.alertChannelId || "").trim(),
+    };
+
+    const next = { discord, autoSkelly };
+    writeSettings(next);
+    setSettingsCached(next);
     await restartDiscordFromConfig();
 
     res.json({ ok: true });
@@ -221,3 +256,39 @@ server.listen(3000, () => {
 
 // discord status (optional)
 startDiscordFromConfig();
+
+function formatMentions(raw) {
+    const ids = String(raw || "")
+        .split(/[\s,]+/g)
+        .map((s) => s.trim())
+        .filter(Boolean);
+    const parts = [];
+    for (const id of ids) {
+        if (id.startsWith("<@") && id.endsWith(">")) { parts.push(id); continue; }
+        if (/^\d{15,22}$/.test(id)) parts.push(`<@${id}>`);
+        else if (/^@&\d{15,22}$/.test(id)) parts.push(`<@&${id.slice(2)}>`);
+        else if (/^@?\d{15,22}$/.test(id)) parts.push(`<@${id.replace(/^@/, "")}>`);
+    }
+    return parts.join(" ");
+}
+
+// Auto-buy skelly loop (optional)
+startAutoSkelly({
+    bots,
+    fetchStats: fetchDonutStats,
+    getSettings: getSettingsCached,
+    log: (bot, type, message) => io.emit("log", { bot, type, message }),
+    notify: async ({ kind, bot, shards }) => {
+        const settings = getSettingsCached();
+        const alertChannelId = settings?.autoSkelly?.alertChannelId || settings?.discord?.channelId;
+        const mentionText = settings?.autoSkelly?.mentionIds ? formatMentions(settings.autoSkelly.mentionIds) : "";
+        const header =
+            kind === "skelly_threshold"
+                ? "⚠️ **Skelly ready**"
+                : "✅ **Skelly bought**";
+        const content = `${mentionText ? mentionText + " " : ""}${header} — **${bot}** (shards: **${Math.floor(shards)}**)`;
+        try {
+            await discordService?.send?.({ channelId: alertChannelId, content });
+        } catch { }
+    },
+});

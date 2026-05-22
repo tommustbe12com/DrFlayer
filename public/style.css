@@ -557,3 +557,47 @@ button:hover {
     font-size: 12px;
     color: #777;
 }
+
+.checkline {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #ddd;
+}
+
+.checkline input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(160px, 1fr));
+    gap: 10px;
+    margin-top: 6px;
+}
+
+.stat-box {
+    background: #0f0f0f;
+    border: 1px solid #242424;
+    border-radius: 8px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.stat-label {
+    font-size: 11px;
+    color: #777;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.stat-value {
+    font-size: 18px;
+    font-weight: 700;
+    color: #facc15;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
