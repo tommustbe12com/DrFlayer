@@ -98,6 +98,14 @@ function fmtTime(seconds) {
   return parts.join(' ');
 }
 
+// DonutSMP API playtime is in milliseconds (commonly ~1e7 for a few hours).
+function fmtPlaytime(playtime) {
+  const n = Number(playtime);
+  if (!Number.isFinite(n)) return fmtTime(0);
+  const seconds = n >= 10_000_000 ? n / 1000 : n;
+  return fmtTime(seconds);
+}
+
 function mcTextToHtml(text) {
     let html = '';
     let color = '';
@@ -469,7 +477,7 @@ async function fetchStats(username, scoreboardEl) {
       line(`⛏ Broken: ${fmtCommas(data.broken_blocks)}`),
       line(`🏗 Placed: ${fmtCommas(data.placed_blocks)}`),
       line(`🧟 Mobs: ${fmtCommas(data.mobs_killed)}`),
-      line(`⏱ Playtime: ${fmtTime(data.playtime)}`),
+      line(`⏱ Playtime: ${fmtPlaytime(data.playtime)}`),
       line(`🛒 Shop Spent: ${fmt(data.money_spent_on_shop)}`),
       line(`💸 Earned: ${fmt(data.money_made_from_sell)}`)
     );
@@ -502,7 +510,7 @@ async function searchPlayer() {
       line(`⛏ Broken: ${fmtCommas(data.broken_blocks)}`),
       line(`🏗 Placed: ${fmtCommas(data.placed_blocks)}`),
       line(`🧟 Mobs: ${fmtCommas(data.mobs_killed)}`),
-      line(`⏱ Playtime: ${fmtTime(data.playtime)}`),
+      line(`⏱ Playtime: ${fmtPlaytime(data.playtime)}`),
       line(`🛒 Shop Spent: ${fmt(data.money_spent_on_shop)}`),
       line(`💸 Earned: ${fmt(data.money_made_from_sell)}`)
     );

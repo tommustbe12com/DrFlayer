@@ -27,6 +27,13 @@ function fmtTime(seconds) {
   return parts.join(" ");
 }
 
+function fmtPlaytime(playtime) {
+  const n = Number(playtime);
+  if (!Number.isFinite(n)) return fmtTime(0);
+  const seconds = n >= 10_000_000 ? n / 1000 : n;
+  return fmtTime(seconds);
+}
+
 function fmtDurationMs(ms) {
   ms = Math.max(0, Math.floor(Number(ms) || 0));
   return fmtTime(ms / 1000);
@@ -119,17 +126,18 @@ export function startDiscordStatusService({
 
     const perBot = [];
     let totalShards = 0;
-    let totalPlaytime = 0;
+    let totalPlaytimeSeconds = 0;
 
     for (const [name, entry] of entries) {
       const stats = await getStatsCached(name);
       const shards = Number(stats?.shards ?? 0) || 0;
-      const playtime = Number(stats?.playtime ?? 0) || 0;
+      const playtimeRaw = Number(stats?.playtime ?? 0) || 0;
+      const playtimeSeconds = playtimeRaw >= 10_000_000 ? playtimeRaw / 1000 : playtimeRaw;
       totalShards += shards;
-      totalPlaytime += playtime;
+      totalPlaytimeSeconds += playtimeSeconds;
 
       const uptime = entry?.startedAt ? fmtDurationMs(now - entry.startedAt) : "—";
-      const status = entry?.bot ? "Online" : "—";
+      const status = entry?.bot ? "🟢 Online" : "⚫ Offline";
 
       perBot.push({
         name,
@@ -137,33 +145,44 @@ export function startDiscordStatusService({
         uptime,
         shards,
         money: Number(stats?.money ?? 0) || 0,
-        playtime,
+        playtimeRaw,
+        playtimeSeconds,
       });
     }
 
     perBot.sort((a, b) => b.shards - a.shards || a.name.localeCompare(b.name));
 
-    const lines = perBot.slice(0, 20).map((b) => {
-      return `• **${safeOneLine(b.name)}** — ${b.status} | Uptime: ${b.uptime} | Shards: ${fmt(b.shards)} | Playtime: ${fmtTime(
-        b.playtime
-      )}`;
+    const lines = perBot.slice(0, 15).map((b) => {
+      return [
+        `**${safeOneLine(b.name)}**  ${b.status}`,
+        `⏱ Uptime: **${b.uptime}**`,
+        `💎 Shards: **${fmt(b.shards)}**`,
+        `🕒 Playtime: **${fmtPlaytime(b.playtimeRaw)}**`,
+      ].join("  •  ");
     });
 
-    if (perBot.length > 20) lines.push(`• …and ${perBot.length - 20} more`);
+    if (perBot.length > 15) lines.push(`…and **${perBot.length - 15}** more`);
 
     const logs = (getRecentLogs?.(8) ?? []).slice(-8);
-    const logLines =
+    const logText =
       logs.length === 0
-        ? ["(none yet)"]
-        : logs.map((l) => `• [${safeOneLine(l.bot)}] ${safeOneLine(l.type)}: ${safeOneLine(l.message)}`.slice(0, 240));
+        ? "(none yet)"
+        : logs
+            .map((l) => `[${safeOneLine(l.bot)}] ${safeOneLine(l.type)}: ${safeOneLine(l.message)}`)
+            .join("\n")
+            .slice(0, 950);
 
     const embed = new EmbedBuilder()
-      .setTitle("Mineflayer Bot Status")
-      .setColor(0x2b90d9)
-      .setDescription(lines.join("\n") || "(no bots connected)")
+      .setTitle("🤖 DrFlayer — Bot Dashboard")
+      .setColor(entries.length ? 0x22c55e : 0x6b7280)
+      .setDescription(lines.join("\n\n") || "No bots connected.")
       .addFields(
-        { name: "Summary", value: `Bots: **${entries.length}**\nTotal shards: **${fmt(totalShards)}**\nTotal playtime: **${fmtTime(totalPlaytime)}**`, inline: true },
-        { name: "Recent logs", value: logLines.join("\n").slice(0, 1024), inline: false }
+        {
+          name: "📊 Summary",
+          value: `Bots: **${entries.length}**\nShards (total): **${fmt(totalShards)}**\nPlaytime (total): **${fmtTime(totalPlaytimeSeconds)}**`,
+          inline: true,
+        },
+        { name: "🧾 Recent Logs", value: "```txt\n" + logText + "\n```", inline: false }
       )
       .setFooter({ text: `Updates every ${Math.round(updateEveryMs / 1000)}s` })
       .setTimestamp(new Date());
