@@ -86,7 +86,12 @@ Posts one embed message and edits it every ~10 seconds with:
 * DonutSMP stats snapshot (shards/playtime/money, cached ~60s)
 * Recent dashboard logs
 
-Set environment variables:
+What the embed looks like:
+
+<img width="671" height="813" alt="image" src="https://github.com/user-attachments/assets/d33bafa5-e81f-4de5-b870-83238e7825a0" />
+
+
+Set environment variables (you can do discord token, channel id, and message id in the dashboard):
 * `DISCORD_TOKEN` (required)
 * `DISCORD_STATUS_CHANNEL_ID` (required) – channel to post/edit the status embed
 * `DISCORD_STATUS_MESSAGE_ID` (optional) – if set, edits that message instead of creating one
