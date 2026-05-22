@@ -430,10 +430,17 @@ function createBotUI(name) {
   disconnectBtn.textContent = 'Disconnect ' + name;
   disconnectBtn.onclick = () => disconnectBot(name);
 
+  const skellyBtn = document.createElement('button');
+  skellyBtn.className = 'skelly-btn';
+  skellyBtn.title = 'Run Auto-Buy Skelly sequence once';
+  skellyBtn.textContent = 'Buy Skelly';
+  skellyBtn.onclick = () => socket.emit("buySkelly", { botName: name });
+
   const header = document.createElement('div');
   header.className = 'bot-header';
   header.appendChild(head);
   header.appendChild(nameEl);
+  header.appendChild(skellyBtn);
   header.appendChild(disconnectBtn);
 
   const cmdInput = document.createElement('input');

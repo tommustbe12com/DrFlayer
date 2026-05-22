@@ -61,6 +61,13 @@ export async function createBotInstance({ email, host, io }) {
             io.emit("botRegistered", { email, username: mcName });
             log(io, mcName, "success", "Spawned successfully");
 
+            bot._client.on("open_window", (packet) => {
+                console.log("RAW open_window packet:", JSON.stringify(packet));
+            });
+            bot.on("windowOpen", (w) => {
+                console.log("windowOpen event:", w?.title, "slots:", w?.slots?.length);
+            });
+
             setTimeout(() => {
                 bot.chat("/afk 10");
             }, 3000);

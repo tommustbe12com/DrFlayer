@@ -7,6 +7,7 @@ import { startDiscordStatusService } from "./discord/discordStatusService.js";
 import fs from "fs";
 import path from "path";
 import { startAutoSkelly } from "./bots/autoSkelly.js";
+import { buySkellyOnce } from "./bots/autoSkelly.js";
 
 const app = express();
 const server = http.createServer(app);
@@ -246,6 +247,28 @@ io.on("connection", (socket) => {
             } catch (err) {
                 io.emit("log", { bot: name, type: "error", message: err.message });
             }
+        }
+    });
+
+    socket.on("buySkelly", async ({ botName }) => {
+        let entry = bots[botName];
+        let key = botName;
+
+        if (!entry) {
+            const found = Object.entries(bots).find(([, e]) => e.email === botName);
+            if (found) { [key, entry] = found; }
+        }
+        if (!entry?.bot) return;
+
+        io.emit("log", { bot: key, type: "info", message: "Manual Buy Skelly requested..." });
+        try {
+            await buySkellyOnce({
+                bot: entry.bot,
+                log: (type, message) => io.emit("log", { bot: key, type, message }),
+            });
+            io.emit("log", { bot: key, type: "success", message: "Manual Buy Skelly sequence finished." });
+        } catch (e) {
+            io.emit("log", { bot: key, type: "error", message: `Manual Buy Skelly failed: ${e?.message || e}` });
         }
     });
 });
