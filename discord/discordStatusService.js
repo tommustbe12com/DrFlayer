@@ -219,13 +219,13 @@ export function startDiscordStatusService({
             return;
           }
         } catch {
-          // ignore repost failures
+          // repost ignore
         }
       }
 
       writeJsonAtomic(storagePath, { channelId, messageId: lastMessageId, updatedAt: new Date().toISOString() });
     } catch {
-      // keep running; next tick may recover
+      // next tick might ifx so keep running
     }
   }
 

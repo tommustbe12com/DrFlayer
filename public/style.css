@@ -12,7 +12,7 @@ body {
     overflow: hidden;
 }
 
-/* sidebar accounts */
+/* sidebar accs */
 .sidebar {
     width: 180px;
     min-width: 180px;
@@ -80,7 +80,7 @@ body {
     overflow: hidden;
 }
 
-/* top bar with selections */
+/* top bar with sel */
 .topbar {
     padding: 10px 14px;
     background: #1b1b1b;
@@ -162,7 +162,7 @@ button:hover {
     display: block;
 }
 
-/* tab panels */
+/* tab panel */
 .tab-panel {
     display: none;
     flex-direction: column;

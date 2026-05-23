@@ -16,7 +16,7 @@ function includesText(hay, needle) {
 function windowTitleStr(title) {
   if (!title) return "";
   if (typeof title === "string") return stripMcFormatting(title);
-  // { type: 'string', value: '...' }  or  { text: '...' }
+  // json menus
   const raw = title?.value ?? title?.text ?? JSON.stringify(title);
   return stripMcFormatting(String(raw));
 }

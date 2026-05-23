@@ -17,7 +17,7 @@ const API_KEY = process.env.DONUTSMP_API_KEY || "asdfasdf"; // optional api key 
 
 // log hist
 const LOG_LIMIT = 500;
-const logHistory = { _master: [] }; // keyed by botName, _master = all
+const logHistory = { _master: [] }; // keyed by botName _master = all
 
 function pushLog(data) {
     // master
@@ -89,7 +89,7 @@ debug.disable("*");
     };
 });
 
-// proxy stats (optional)
+// proxy stats not required
 app.get("/api/stats/:username", async (req, res) => {
     try {
         const result = await fetchDonutStats(req.params.username);
@@ -100,7 +100,7 @@ app.get("/api/stats/:username", async (req, res) => {
     }
 });
 
-// discord config (local dashboard convenience; do not expose publicly)
+// discord config rly wouldn't recommend exposing
 app.get("/api/settings", (req, res) => {
     const settings = readSettings();
     res.json({
@@ -277,7 +277,7 @@ server.listen(3000, () => {
     console.log("Dashboard running on http://localhost:3000");
 });
 
-// discord status (optional)
+// discord status not req
 startDiscordFromConfig();
 
 function formatMentions(raw) {
@@ -295,7 +295,7 @@ function formatMentions(raw) {
     return parts.join(" ");
 }
 
-// Auto-buy skelly loop (optional)
+// auto skelly loop not req
 startAutoSkelly({
     bots,
     fetchStats: fetchDonutStats,
@@ -309,7 +309,7 @@ startAutoSkelly({
             kind === "skelly_threshold"
                 ? "⚠️ **Skelly ready**"
                 : "✅ **Skelly bought**";
-        const content = `${mentionText ? mentionText + " " : ""}${header} — **${bot}** (shards: **${Math.floor(shards)}**)`;
+        const content = `${mentionText ? mentionText + " " : ""}${header} - **${bot}** (shards: **${Math.floor(shards)}**)`;
         try {
             await discordService?.send?.({ channelId: alertChannelId, content });
         } catch { }
