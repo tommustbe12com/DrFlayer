@@ -1,3 +1,4 @@
+import fs from "fs";
 import mineflayer from "mineflayer";
 
 export const bots = {};
@@ -5,13 +6,21 @@ const creating = new Set();
 export const manualDisconnects = new Set(); // manual disconnect emails
 
 const pendingAuth = new Set(); // msa auth pending
+const AUTH_FOLDER = "./auth";
 
 function log(io, bot, type, message) {
     io.emit("log", { bot, type, message });
-    console.log(`[${bot}] ${message}`);
+    const consoleMessage = String(message || "").replace(/§#?[0-9a-fA-F]{6}/g, "").replace(/§./g, "");
+    console.log(`[${bot}] ${consoleMessage}`);
 }
 
-export async function createBotInstance({ email, host, io }) {
+function purgeAuthCache() {
+    try {
+        fs.rmSync(AUTH_FOLDER, { recursive: true, force: true });
+    } catch { }
+}
+
+export async function createBotInstance({ email, host, io, onChatMessage }) {
     if (creating.has(email)) return;
     creating.add(email);
 
@@ -37,6 +46,7 @@ export async function createBotInstance({ email, host, io }) {
         });
 
         let mcName = email;
+        const recentChatFingerprints = new Map();
 
         bot.once("login", () => {
             // login after msa, dismiss now
@@ -73,9 +83,15 @@ export async function createBotInstance({ email, host, io }) {
             }, 3000);
         });
 
-        bot.on("message", (jsonMsg) => {
-            const raw = jsonMsg.toMotd();
-            const plain = jsonMsg.toString();
+        const handleChat = (raw, plain) => {
+            const fingerprint = `${String(raw ?? "")}\n${String(plain ?? "")}`;
+            const now = Date.now();
+            const lastSeen = recentChatFingerprints.get(fingerprint) || 0;
+            if (now - lastSeen < 500) return;
+            recentChatFingerprints.set(fingerprint, now);
+            for (const [key, seenAt] of recentChatFingerprints) {
+                if (now - seenAt > 5000) recentChatFingerprints.delete(key);
+            }
 
             //skip auth-related server chat lines onMsaCode etc
             if (
@@ -86,7 +102,14 @@ export async function createBotInstance({ email, host, io }) {
                 plain.includes("Signed in with Microsoft")
             ) return;
 
+            onChatMessage?.({ bot: mcName, raw, plain });
             log(io, mcName, "chat", raw);
+        };
+
+        bot.on("message", (jsonMsg) => {
+            const raw = jsonMsg.toMotd();
+            const plain = jsonMsg.toString();
+            handleChat(raw, plain);
         });
 
         bot.on("end", () => {
@@ -102,7 +125,13 @@ export async function createBotInstance({ email, host, io }) {
         });
 
         bot.on("error", (err) => {
-            log(io, mcName, "error", `Error: ${err.message}`);
+            const message = err?.message || String(err);
+            log(io, mcName, "error", `Error: ${message}`);
+
+            if (/invalid_grant|token.*expired|grant is expired/i.test(message)) {
+                log(io, mcName, "warn", "Auth token expired. Clearing cached auth and re-requesting login.");
+                purgeAuthCache();
+            }
         });
     }
 

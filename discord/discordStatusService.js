@@ -66,6 +66,7 @@ export function startDiscordStatusService({
   bots,
   getRecentLogs,
   fetchStats,
+  getKeyStats,
   token,
   channelId,
   messageId,
@@ -128,6 +129,8 @@ export function startDiscordStatusService({
     const perBot = [];
     let totalShards = 0;
     let totalPlaytimeSeconds = 0;
+    const keyStats = getKeyStats?.() || { totals: { common: 0 }, perBot: {} };
+    const totalCommonKeys = Number(keyStats?.totals?.common ?? 0) || 0;
 
     for (const [name, entry] of entries) {
       const stats = await getStatsCached(name);
@@ -148,6 +151,7 @@ export function startDiscordStatusService({
         money: Number(stats?.money ?? 0) || 0,
         playtimeRaw,
         playtimeSeconds,
+        commonKeys: Number(keyStats?.perBot?.[name]?.common ?? 0) || 0,
       });
     }
 
@@ -158,6 +162,7 @@ export function startDiscordStatusService({
         `**${safeOneLine(b.name)}**  ${b.status}`,
         `⏱ Uptime: **${b.uptime}**`,
         `💎 Shards: **${fmt(b.shards)}**`,
+        `🔑 Keys: **${fmt(b.commonKeys)}**`,
         `🕒 Playtime: **${fmtPlaytime(b.playtimeRaw)}**`,
       ].join("  •  ");
     });
@@ -180,11 +185,16 @@ export function startDiscordStatusService({
       .addFields(
         {
           name: "📊 Summary",
-          value: `Bots: **${entries.length}**\nShards (total): **${fmt(totalShards)}**\nPlaytime (total): **${fmtTime(totalPlaytimeSeconds)}**`,
+          value: `Bots: **${entries.length}**\nShards (total): **${fmt(totalShards)}**\nPlaytime (total): **${fmtTime(totalPlaytimeSeconds)}**\nCommon keys (tracked): **${fmt(totalCommonKeys)}**`,
           inline: true,
         },
         { name: "🧾 Recent Logs", value: "```txt\n" + logText + "\n```", inline: false }
       )
+      .addFields({
+        name: "🔑 Key Tracking Note",
+        value: "Only tracked key drops are shown here because there is no crate-key API to read directly.",
+        inline: false,
+      })
       .setFooter({ text: `Updates every ${Math.round(updateEveryMs / 1000)}s` })
       .setTimestamp(new Date());
 

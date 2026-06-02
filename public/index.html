@@ -31,6 +31,16 @@
             <button onclick="broadcastCommand()">Send All</button>
         </div>
 
+        <div class="panel-card master-key-card">
+            <div class="panel-title-row">
+                <div class="panel-title">Tracked Key Totals</div>
+                <button class="info-btn" title="More info" onclick="showTrackedKeyInfo()">i</button>
+            </div>
+            <div class="master-key-value" id="master-common-keys">0</div>
+            <div class="master-key-subvalue" id="master-tracked-bots">0 across bots tracked locally</div>
+            <div class="panel-hint" id="tracked-keys-note">Showing only tracked key drops. There is no crate-key API, so totals are based on observed chat messages.</div>
+        </div>
+
         <div class="logs" id="master-logs"></div>
     </div>
 

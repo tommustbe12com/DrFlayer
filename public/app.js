@@ -3,12 +3,14 @@ const socket = io();
 const botsDiv = document.getElementById("bots");
 const botElements = {};   // key, { panel, logsEl, scoreboardEl }
 let currentTab = "master";
+let keyStats = { totals: { common: 0 }, perBot: {}, updatedAt: null };
 
 window.createBot = createBot;
 window.switchTab = switchTab;
 window.searchPlayer = searchPlayer;
 window.broadcastCommand = broadcastCommand;
 window.saveSettings = saveSettings;
+window.showTrackedKeyInfo = showTrackedKeyInfo;
 window._statIntervals = {};
 
 async function loadSettings() {
@@ -211,6 +213,51 @@ function appendLog(logsEl, data) {
   logsEl.scrollTop = logsEl.scrollHeight;
 }
 
+function formatNumber(n) {
+  return Number(n || 0).toLocaleString();
+}
+
+function showTrackedKeyInfo() {
+  document.getElementById('tracked-key-modal')?.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'tracked-key-modal';
+  overlay.innerHTML = `
+    <div class="limit-box key-info-box">
+      <div class="limit-title">Tracked Key Totals</div>
+      <div class="limit-body">
+        This dashboard only shows crate keys it has seen in chat and tracked locally.
+        There is no API for crate keys like this, so these totals are based on observed drops only.
+      </div>
+      <div class="limit-actions">
+        <button class="limit-btn-yes">Got it</button>
+      </div>
+    </div>
+  `;
+  overlay.querySelector('.limit-btn-yes').onclick = () => overlay.remove();
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  document.body.appendChild(overlay);
+}
+
+function renderKeyStats() {
+  const masterCount = document.getElementById('master-common-keys');
+  const masterNote = document.getElementById('tracked-keys-note');
+  const masterBotCount = document.getElementById('master-tracked-bots');
+  const total = Number(keyStats?.totals?.common ?? 0) || 0;
+  const trackedPerBot = Object.values(keyStats?.perBot || {}).reduce((sum, entry) => sum + (Number(entry?.common ?? 0) || 0), 0);
+  if (masterCount) masterCount.textContent = formatNumber(total);
+  if (masterBotCount) masterBotCount.textContent = `${formatNumber(trackedPerBot)} across bots tracked locally`;
+  if (masterNote) {
+    masterNote.textContent = `Showing only tracked key drops. Last update: ${keyStats?.updatedAt ? new Date(keyStats.updatedAt).toLocaleString() : 'never'}.`;
+  }
+
+  for (const [name, entry] of Object.entries(botElements)) {
+    if (entry?.keyValueEl) {
+      entry.keyValueEl.textContent = formatNumber(keyStats?.perBot?.[name]?.common ?? 0);
+    }
+  }
+}
+
 // reconnect
 const activeBotNames = new Set(); // list of the usernames and emails
 
@@ -232,6 +279,11 @@ socket.on("activeBots", (activeBots) => {
       );
     }
   }
+});
+
+socket.on("keyStatsUpdated", (stats) => {
+  keyStats = stats || { totals: { common: 0 }, perBot: {}, updatedAt: null };
+  renderKeyStats();
 });
 
 socket.on("log", (data) => {
@@ -459,11 +511,20 @@ function createBotUI(name) {
   const scoreboardEl = document.createElement('div');
   scoreboardEl.className = 'scoreboard';
 
+  const keyStatsBox = document.createElement('div');
+  keyStatsBox.className = 'key-stats-inline';
+  keyStatsBox.innerHTML = `
+    <div class="key-stats-label">Common keys tracked</div>
+    <div class="key-stats-value">0</div>
+  `;
+  const keyValueEl = keyStatsBox.querySelector('.key-stats-value');
+
   const logsEl = document.createElement('div');
   logsEl.className = 'logs';
 
   panel.appendChild(header);
   panel.appendChild(cmdRow);
+  panel.appendChild(keyStatsBox);
   panel.appendChild(scoreboardEl);
   panel.appendChild(logsEl);
 
@@ -473,7 +534,8 @@ function createBotUI(name) {
 
   document.querySelector('.main').appendChild(panel);
 
-  botElements[name] = { panel, logsEl, scoreboardEl, sendBtn, cmdInput };
+  botElements[name] = { panel, logsEl, scoreboardEl, sendBtn, cmdInput, keyValueEl };
+  renderKeyStats();
 }
 
 // disconnect event

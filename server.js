@@ -18,6 +18,53 @@ const API_KEY = process.env.DONUTSMP_API_KEY || "asdfasdf"; // optional api key 
 // log hist
 const LOG_LIMIT = 500;
 const logHistory = { _master: [] }; // keyed by botName _master = all
+const KEY_STATS_PATH = "./.data/key-stats.json";
+const KEY_TYPES = { common: true };
+
+function readKeyStats() {
+    try {
+        const parsed = JSON.parse(fs.readFileSync(KEY_STATS_PATH, "utf8"));
+        return {
+            totals: { common: Number(parsed?.totals?.common ?? 0) || 0 },
+            perBot: parsed?.perBot && typeof parsed.perBot === "object" ? parsed.perBot : {},
+            updatedAt: parsed?.updatedAt || null,
+        };
+    } catch {
+        return { totals: { common: 0 }, perBot: {}, updatedAt: null };
+    }
+}
+
+function writeKeyStats(stats) {
+    fs.mkdirSync(path.dirname(KEY_STATS_PATH), { recursive: true });
+    fs.writeFileSync(KEY_STATS_PATH, JSON.stringify(stats, null, 2), "utf8");
+}
+
+let keyStats = readKeyStats();
+
+function getKeyStatsSnapshot() {
+    return {
+        totals: { common: Number(keyStats?.totals?.common ?? 0) || 0 },
+        perBot: keyStats?.perBot || {},
+        updatedAt: keyStats?.updatedAt || null,
+    };
+}
+
+function emitKeyStats() {
+    io.emit("keyStatsUpdated", getKeyStatsSnapshot());
+}
+
+function incrementKeyStat(botName, type) {
+    const normalizedType = String(type || "").toLowerCase();
+    if (!KEY_TYPES[normalizedType]) return false;
+
+    keyStats.totals[normalizedType] = Number(keyStats.totals[normalizedType] ?? 0) + 1;
+    if (!keyStats.perBot[botName]) keyStats.perBot[botName] = { common: 0 };
+    keyStats.perBot[botName][normalizedType] = Number(keyStats.perBot[botName][normalizedType] ?? 0) + 1;
+    keyStats.updatedAt = new Date().toISOString();
+    writeKeyStats(keyStats);
+    emitKeyStats();
+    return true;
+}
 
 function pushLog(data) {
     // master
@@ -38,6 +85,48 @@ io.emit = (event, ...args) => {
 
 function getRecentLogs(limit = 8) {
     return logHistory._master.slice(-Math.max(0, Math.min(LOG_LIMIT, limit)));
+}
+
+function normalizeKeyMessage(message) {
+    return String(message || "")
+        .replace(/§#?[0-9a-fA-F]{6}/g, "")
+        .replace(/§./g, "")
+        .replace(/[ʏᴏᴜᴊʀѕᴛɢᴍᴄᴋᴇʟʜʙɴ]/gi, (ch) => ({
+            "ʏ": "y",
+            "ᴏ": "o",
+            "ᴜ": "u",
+            "ᴊ": "j",
+            "ʀ": "r",
+            "ѕ": "s",
+            "ᴛ": "t",
+            "ɢ": "g",
+            "ᴍ": "m",
+            "ᴄ": "c",
+            "ᴋ": "k",
+            "ᴇ": "e",
+            "ʟ": "l",
+            "ʜ": "h",
+            "ʙ": "b",
+            "ɴ": "n",
+        }[ch.toLowerCase()] || ch))
+        .normalize("NFKC")
+        .toLowerCase()
+        .replace(/\s+/g, " ")
+        .trim();
+}
+
+function detectKeyDrop(message) {
+    const raw = String(message || "");
+    const text = normalizeKeyMessage(message);
+    const match =
+        raw.match(/(?:you just got|ʏᴏᴜ ᴊᴜѕᴛ ɢᴏᴛ)\s+(\d+)\s+(?:common|ᴄᴏᴍᴍᴏɴ)\s+key/i) ||
+        text.match(/\b(?:you just got|got)\s+(\d+)\s+common\s+key\b/i) ||
+        text.match(/\b(\d+)\s+common\s+key\b/i) ||
+        (/warp crates/i.test(raw) && /key/i.test(raw) ? [null, "1"] : null);
+    if (!match) return null;
+    const amount = Number(match[1] || 0);
+    if (!Number.isFinite(amount) || amount <= 0) return null;
+    return { type: "common", amount };
 }
 
 async function fetchDonutStats(username) {
@@ -139,6 +228,7 @@ function startDiscordFromConfig() {
         bots,
         getRecentLogs,
         fetchStats: fetchDonutStats,
+        getKeyStats: getKeyStatsSnapshot,
         token: cfg.token,
         channelId: cfg.channelId,
         messageId: cfg.messageId,
@@ -199,6 +289,7 @@ io.on("connection", (socket) => {
         email: entry.email,
     }));
     socket.emit("activeBots", activeBots);
+    socket.emit("keyStatsUpdated", getKeyStatsSnapshot());
 
     // replay
     for (const entry of logHistory._master) {
@@ -207,7 +298,18 @@ io.on("connection", (socket) => {
 
     socket.on("createBot", async ({ username, host }) => {
         if (!username || !host) return;
-        await createBotInstance({ email: username, host, io });
+        await createBotInstance({
+            email: username,
+            host,
+            io,
+            onChatMessage: ({ bot, raw, plain }) => {
+                const keyDrop = detectKeyDrop(raw) || detectKeyDrop(plain);
+                if (!keyDrop) return;
+                for (let i = 0; i < keyDrop.amount; i += 1) {
+                    incrementKeyStat(bot, keyDrop.type);
+                }
+            },
+        });
     });
 
     socket.on("sendCommand", ({ botName, command }) => {
